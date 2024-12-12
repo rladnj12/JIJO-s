@@ -1,16 +1,14 @@
-version: '3.8'
-
+version: "3.8"
 services:
   postgres-server:
     container_name: postgres-server
     image: postgres:13.0-alpine
     restart: always
-    environment:  
+    environment:
       POSTGRES_USER: zabbix
       POSTGRES_PASSWORD: passwd!Q
       POSTGRES_DB: zabbix
       PG_DATA: /var/lib/postgresql/data/pgdata
-
   zabbix-server:
     container_name: zabbix-server
     image: zabbix/zabbix-server-pgsql:ubuntu-7.0-latest
@@ -27,41 +25,44 @@ services:
       - postgres-server
     volumes:
       - ./volumes/zabbix/alertscripts:/usr/lib/zabbix/alertscripts
-
+      - /var/zabbix/protocolo/snmptraps:/var/lib/zabbix/snmptraps
   zabbix-frontend:
     container_name: zabbix-frontend
     image: zabbix/zabbix-web-nginx-pgsql:ubuntu-7.0-latest
     restart: always
     ports:
-      - '80:8080'
+      - 80:8080/tcp
     environment:
       POSTGRES_USER: zabbix
       POSTGRES_PASSWORD: passwd!Q
       POSTGRES_DB: zabbix
       ZBX_SERVER_HOST: zabbix-server
       ZBX_POSTMAXSIZE: 64M
-      PHP_TZ: "Asia/Seoul"  
+      PHP_TZ: Asia/Seoul # 시간대 설정 (한국)
       ZBX_MAXEXECUTIONTIME: 500
     depends_on:
       - postgres-server
       - zabbix-server
-
-  zabbix-agent:
-    container_name: zabbix-agent
-    image: zabbix/zabbix-agent:ubuntu-7.0-latest
-    privileged: true
-    restart: unless-stopped
-    environment:
-      - ZBX_SERVER_HOST=zabbix-server
-
+  zabbix-snmptraps:
+    container_name: zabbix-snmptraps
+    image: zabbix/zabbix-snmptraps
+    restart: always
+    volumes:
+      - /var/zabbix/protocolo/snmptraps:/var/lib/zabbix/snmptraps:rw
+      - /var/zabbix/protocolo/mibs:/usr/share/snmp/mibs:ro
+    ports:
+      - 161:161/udp
+      - 162:162/udp
   grafana:
     container_name: grafana
     image: grafana/grafana:latest
     restart: always
     ports:
-      - '3000:3000'
-    environment: 
-      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
+      - 3000:3000 # Grafana 웹 포트 매핑 (기본 포트)
+    environment:
+      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app # Grafana의 Zabbix 플러그인 설치
     depends_on:
       - postgres-server
       - zabbix-server
+networks:
+  default: null
